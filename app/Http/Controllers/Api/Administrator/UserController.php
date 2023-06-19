@@ -11,26 +11,29 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
 
 class UserController extends Controller
-{   
-    public function index(){
+{
+    public function index()
+    {
         $limit = request('limit', 10); // default limit is 10 if not provided
         $offset = request('offset', 0); // default offset is 0 if not provided
-        
+
         try {
-            $data = User::skip($offset)
-                                ->take($limit)
-                                ->latest()
-                                ->get();
+
+            $data = User::skip($offset)->take($limit)->orderBy('name')->get();
 
             if ($data->isEmpty()) {
+
                 return response()->json([
                     'message' => 'Data not found',
                     'success' => true,
                     'code' => 401
                 ], 401);
             }
+
             return response()->json([
                 'data' => $data,
                 'message' => 'Success to Fetch All Datas',
@@ -39,6 +42,7 @@ class UserController extends Controller
             ], 200);
 
         }catch (\Illuminate\Database\QueryException $ex) {
+
             return response()->json([
                 'message' => 'Something went wrong',
                 'success' => false,
@@ -48,17 +52,19 @@ class UserController extends Controller
     }
 
     public function show($id)
-    {   
+    {
         try{
             $data = User::where('id', $id)->first();
 
             if (!$data) {
+
                 return response()->json([
                     'message' => 'Data not found in record',
                     'success' => true,
                     'code' => 401
                 ], 401);
             }
+
             return response()->json([
                 'data' => $data,
                 'message' => 'Success to Fetch All Datas',
@@ -67,6 +73,7 @@ class UserController extends Controller
             ], 200);
 
         }catch (\Illuminate\Database\QueryException $ex) {
+
             return response()->json([
                 'message' => 'Something went wrong',
                 'success' => false,
@@ -76,14 +83,14 @@ class UserController extends Controller
     }
 
     public function user_store(Request $request)
-    {   
+    {
         try {
-            
+
             $validator = Validator::make($request->all(), [
                 'name' => 'required',
                 'email' => 'required'
             ]);
-    
+
             if ($validator->fails()) {
                 return response()->json([
                     'message' => $validator->errors(),
@@ -91,13 +98,13 @@ class UserController extends Controller
                     'success' => false
                 ], 400);
             }
-    
-            $existingEmail = User::where('email', $request->email)
-                                        ->first();
-    
+
+            $existingEmail = User::where('email', $request->email)->first();
+
             if ($existingEmail) {
+
                 return response()->json([
-                    'message' => 'Email already used.',
+                    'message' => 'Email already used',
                     'code' => 409,
                     'success' => false
                 ], 409);
@@ -110,7 +117,7 @@ class UserController extends Controller
                 'status'                => '1',
                 'created_at'            => Carbon::now()
             ]);
-    
+
             return response()->json([
                 'data' => $MasterUser,
                 'message' => 'Data Created Successfully.',
@@ -119,6 +126,7 @@ class UserController extends Controller
             ], 200);
 
         } catch (QueryException $ex) {
+
             return response()->json([
                 'message' => 'Failed to create data',
                 'code' => 500,
@@ -127,12 +135,48 @@ class UserController extends Controller
         }
     }
 
-    public function reset_password($id)
-    {   
+    public function update(Request $request, $id)
+    {
         try {
+            $data = User::findOrFail($id);
+
+            $name = $request->input('name', $data->name);
+            $email = $request->input('email', $data->email);
+
+            $data->update([
+                'name' => $name,
+                'email' => $email,
+            ]);
+
+            return response()->json([
+                'data' => $data,
+                'message' => 'Data Updated Successfully',
+                'code' => 200,
+                'success' => true
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
+            return response()->json([
+                'message' => 'Data not found on record',
+                'code' => 401,
+                'success' => false
+            ], 401);
+        } catch (\Illuminate\Database\QueryException $ex) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'code' => 500,
+                'success' => false
+            ], 500);
+        }
+    }
+
+    public function reset_password($id)
+    {
+        try {
+
             $data = User::where('id', $id)->first();
 
             if (!$data) {
+
                 return response()->json([
                     'message' => 'Record not found.',
                     'code' => 401,
@@ -145,17 +189,57 @@ class UserController extends Controller
             ]);
 
             return response()->json([
-                'data' => [],
                 'message' => 'Password Reset Succesfully',
                 'code' => 200,
                 'success' => true
-            ],200);
+            ], 200);
+
         } catch (QueryException $ex) {
+
             return response()->json([
                 'message' => 'Failed to reset password',
                 'code' => 500,
                 'success' => false
-            ],500);
+            ], 500);
+        }
+    }
+
+    public function toggleActive($id)
+    {
+        try {
+
+            $data = User::findOrFail($id);
+
+            $newStatusValue = ($data->status == 0) ? 2 : 0;
+
+            $data->update([
+                'status' => $newStatusValue,
+            ]);
+
+            $message = ($newStatusValue == 0) ? 'Status updated to Non-Active.' : 'Status updated to Active.';
+
+            return response()->json([
+                'data' => $data,
+                'message' => $message,
+                'code' => 200,
+                'success' => true
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+
+            return response()->json([
+                'message' => 'Record not found.',
+                'code' => 401,
+                'success' => false
+            ], 401);
+
+        } catch (QueryException $ex) {
+
+            return response()->json([
+                'message' => 'Failed to Update',
+                'code' => 500,
+                'success' => false
+            ], 500);
         }
     }
 }
