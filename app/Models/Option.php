@@ -21,8 +21,15 @@ class Option extends Model
         'status'
     ];
 
+    protected $hidden = ['created_at', 'updated_at'];
+
     public function question()
     {
         return $this->belongsTo(Question::class, 'question_id');
+    }
+
+    public function extraAnswers()
+    {
+        return $this->hasMany(ExtraAnswer::class, 'option_id');
     }
 }

@@ -15,8 +15,8 @@ class ExtraAnswer extends Model
 
     protected $fillable = [
         'answer_id',
-        'question_id',
-        'answer',
+        'option_id',
+        'value',
     ];
 
     public function answer()
@@ -24,8 +24,8 @@ class ExtraAnswer extends Model
         return $this->belongsTo(Answer::class, 'answer_id');
     }
 
-    public function question()
+    public function option()
     {
-        return $this->belongsTo(Question::class, 'question_id');
+        return $this->belongsTo(Option::class, 'option_id');
     }
 }

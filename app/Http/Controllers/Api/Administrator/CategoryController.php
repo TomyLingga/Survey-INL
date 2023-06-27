@@ -22,7 +22,7 @@ class CategoryController extends Controller
     public function index()
     {
         try {
-            $categories = Category::with('question')->get();
+            $categories = Category::with('questions')->get();
 
             if ($categories->isEmpty()) {
 
@@ -42,6 +42,8 @@ class CategoryController extends Controller
         } catch (\Illuminate\Database\QueryException $ex) {
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
@@ -51,7 +53,7 @@ class CategoryController extends Controller
     public function show($id)
     {
         try {
-            $data = Category::with('question')->find($id);
+            $data = Category::with('questions')->find($id);
 
             if (!$data) {
 
@@ -72,29 +74,28 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
         }
     }
 
-    private function validateForm(Request $request)
-    {
-        $rules = [
-            'name' => 'required',
-        ];
-
-        $messages = [
-            'name.required' => 'Name is Required.',
-        ];
-
-        return $this->validate($request, $rules, $messages);
-    }
-
     public function store(Request $request)
     {
         try {
-            $this->validateForm($request);
+            $validator = Validator::make($request->all(), [
+                'name' => 'required'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors(),
+                    'code' => 400,
+                    'success' => false
+                ], 400);
+            }
 
             $data = Category::create([
                 'name' => $request->name,
@@ -112,7 +113,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
-                'err' => $e,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
@@ -140,6 +142,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageMissing,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 401,
                 'success' => false
             ], 401);
@@ -147,6 +151,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
@@ -177,6 +183,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);

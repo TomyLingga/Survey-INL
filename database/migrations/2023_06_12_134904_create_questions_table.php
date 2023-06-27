@@ -19,7 +19,7 @@ class CreateQuestionsTable extends Migration
             $table->string('question');
             $table->string('type');
             $table->boolean('require');
-            $table->string('status');
+            $table->string('status',15);
             $table->timestamps();
         });
     }

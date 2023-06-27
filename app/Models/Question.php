@@ -21,18 +21,21 @@ class Question extends Model
         'status'
     ];
 
+    protected $hidden = ['created_at', 'updated_at'];
+
+
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
 
-    public function option()
+    public function options()
     {
         return $this->hasMany(Option::class, 'question_id');
     }
 
-    public function extraAnswer()
+    public function surveyPertanyaans()
     {
-        return $this->hasMany(ExtraAnswer::class, 'question_id');
+        return $this->belongsToMany(SurveyPertanyaan::class);
     }
 }

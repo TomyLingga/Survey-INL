@@ -4,9 +4,16 @@ namespace App\Http\Controllers\Api\Administrator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Survey;
+use App\Models\Question;
+use App\Models\Option;
+use App\Models\Category;
+use App\Models\SurveyPertanyaan;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class SurveyController extends Controller
 {
@@ -20,7 +27,9 @@ class SurveyController extends Controller
     public function index()
     {
         try {
-            $surveys = Survey::with('surveyPertanyaan')->get();
+            $surveys = Survey::with(['surveyPertanyaans' => function ($query) {
+                $query->orderBy('order');
+            }])->get();
 
             if ($surveys->isEmpty()) {
 
@@ -37,42 +46,286 @@ class SurveyController extends Controller
                 'success' => true,
                 'code' => 200
             ], 200);
-        } catch (\Illuminate\Database\QueryException $ex) {
+        } catch (\Illuminate\Database\QueryException $e) {
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
         }
     }
 
-    public function create()
+    public function show($id)
     {
-        //
+        try {
+            $survey = Survey::with([
+                'surveyPertanyaans' => function ($query) {
+                    $query->orderBy('order')->with([
+                        'questions' => function ($query) {
+                            $query->orderBy('category_id')->with('options');
+                        },
+                        'questions.category' // Include the category relationship
+                    ]);
+                }
+            ])->find($id);
+
+            if (!$survey) {
+                return response()->json([
+                    'message' => $this->messageMissing,
+                    'success' => true,
+                    'code' => 401
+                ], 401);
+            }
+
+            return response()->json([
+                'survey' => $survey,
+                'message' => $this->messageSuccess,
+                'success' => true,
+                'code' => 200
+            ], 200);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'success' => false,
+                'code' => 500
+            ], 500);
+        }
     }
 
     public function store(Request $request)
     {
-        //
+        DB::beginTransaction();
+
+        try {
+            $validator = Validator::make($request->all(), [
+                'title' => 'required',
+                'desc' => 'required',
+                'from' => 'required',
+                'to' => 'required',
+                'order_sp.*' => 'required',
+                'value.*' => 'required',
+                'question_order.*' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors(),
+                    'code' => 400,
+                    'success' => false
+                ], 400);
+            }
+
+            $data = Survey::create([
+                'title' => $request->title,
+                'desc' => $request->desc,
+                'from' => $request->from,
+                'to' => $request->to,
+                'status' => '1',
+            ]);
+
+            $orders_sp = $request->order_sp;
+            $values = $request->value;
+
+            foreach ($values as $index => $arrayValue) {
+                $array = [
+                    'survey_id' => $data->id,
+                    'order' => $orders_sp[$index],
+                    'value' => $arrayValue,
+                    'status' => '1',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                $sp = SurveyPertanyaan::create($array);
+
+                $questionOrder = explode(";", $request->question_order);
+
+                $qOrderIndex = explode("|", $questionOrder[$index]);
+
+                if ($sp->order == $qOrderIndex[0]) {
+                    $q_id = explode(",", $qOrderIndex[1]);
+
+                    $q_id = array_map('intval', $q_id);
+
+                    $counter = 1;
+
+                    foreach ($q_id as $id) {
+                        $question = Question::findOrFail($id);
+                        $sp->questions()->attach($id, ['order' => $counter]);
+                        $counter++;
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'data' => $data,
+                'message' => $this->messageCreate,
+                'code' => 200,
+                'success' => true,
+            ], 200);
+
+        } catch (\Exception $e) {
+
+            DB::rollback();
+
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'code' => 500,
+                'success' => false,
+            ], 500);
+        }
     }
 
-    public function show(Survey $survey)
+    public function update(Request $request, $id)
     {
-        //
+        DB::beginTransaction();
+
+        try {
+            $validator = Validator::make($request->all(), [
+                'title' => 'required',
+                'desc' => 'required',
+                'from' => 'required',
+                'to' => 'required',
+                'order_sp.*' => 'required',
+                'value.*' => 'required',
+                'question_order.*' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors(),
+                    'code' => 400,
+                    'success' => false
+                ], 400);
+            }
+
+            $survey = Survey::with('surveyPertanyaans')->findOrFail($id);
+            $survey->title = $request->title ?? $survey->title;
+            $survey->desc = $request->desc ?? $survey->desc;
+            $survey->from = $request->from ?? $survey->from;
+            $survey->to = $request->to ?? $survey->to;
+            $survey->status = '1';
+            $survey->save();
+
+            $orders_sp = $request->order_sp;
+            $values = $request->value;
+            $surveyPertanyaanId = $request->survey_pertanyaan_id;
+
+            $existingIds = $survey->surveyPertanyaan->pluck('id')->toArray();
+            $deleteIds = array_diff($existingIds, $surveyPertanyaanId);
+
+            foreach ($deleteIds as $deleteId) {
+                $surveyPertanyaan = SurveyPertanyaan::find($deleteId);
+                $surveyPertanyaan->questions()->detach();
+            }
+
+            $survey->surveyPertanyaans()->whereIn('id', $deleteIds)->delete();
+
+            foreach ($values as $index => $arrayValue) {
+                $array = [
+                    'survey_id' => $survey->id,
+                    'order' => $orders_sp[$index],
+                    'value' => $arrayValue,
+                    'status' => '1',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                if (isset($surveyPertanyaanId[$index])) {
+                    $sp = SurveyPertanyaan::find($surveyPertanyaanId[$index]);
+                    if ($sp) {
+                        $sp->update($array);
+                    }
+                } else {
+                    $sp = SurveyPertanyaan::create($array);
+                    $survey->surveyPertanyaans()->save($sp);
+                }
+
+                $questionOrder = explode(";", $request->question_order[$index]);
+                $qOrderIndex = explode("|", $questionOrder[0]);
+
+                if ($sp->order == $qOrderIndex[0]) {
+                    $q_ids = explode(",", $qOrderIndex[1]);
+                    $q_ids = array_map('intval', $q_ids);
+
+                    $counter = 1;
+
+                    $sp->questions()->detach();
+
+                    foreach ($q_ids as $questionId) {
+                        $question = Question::findOrFail($questionId);
+                        $sp->questions()->attach($questionId, ['order' => $counter]);
+                        $counter++;
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => $this->messageUpdate,
+                'code' => 200,
+                'success' => true,
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
+            DB::rollback();
+            return response()->json([
+                'message' => $this->messageMissing,
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
+                'code' => 401,
+                'success' => false,
+            ], 401);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'code' => 500,
+                'success' => false,
+            ], 500);
+        }
     }
 
-    public function edit(Survey $survey)
+    public function toggleActive($id)
     {
-        //
-    }
+        try {
 
-    public function update(Request $request, Survey $survey)
-    {
-        //
-    }
+            $data = Survey::findOrFail($id);
 
-    public function destroy(Survey $survey)
-    {
-        //
+            $newStatusValue = ($data->status == 0) ? 2 : 0;
+
+            $data->update([
+                'status' => $newStatusValue,
+            ]);
+
+            $message = ($newStatusValue == 0) ? 'Status updated to Non-Active.' : 'Status updated to Active.';
+
+            return response()->json([
+                'data' => $data,
+                'message' => $message,
+                'code' => 200,
+                'success' => true
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'code' => 500,
+                'success' => false
+            ], 500);
+        }
     }
 }

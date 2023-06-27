@@ -17,8 +17,8 @@ class CreateSurveyPertanyaansTable extends Migration
             $table->id();
             $table->foreignId('survey_id')->constrained('surveys');
             $table->integer('order');
-            $table->string('chapter');
-            $table->string('status');
+            $table->string('value');
+            $table->string('status',15);
             $table->timestamps();
         });
     }

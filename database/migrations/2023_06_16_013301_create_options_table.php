@@ -19,7 +19,7 @@ class CreateOptionsTable extends Migration
             $table->string('value');
             $table->string('description');
             $table->string('extra_answer');
-            $table->string('status');
+            $table->string('status',15);
             $table->timestamps();
         });
     }

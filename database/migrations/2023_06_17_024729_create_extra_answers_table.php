@@ -16,7 +16,7 @@ class CreateExtraAnswersTable extends Migration
         Schema::create('extra_answers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('answer_id')->constrained('answers');
-            $table->foreignId('question_id')->constrained('questions');
+            $table->foreignId('option_id')->constrained('options');
             $table->string('value');
             $table->timestamps();
         });

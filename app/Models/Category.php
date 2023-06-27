@@ -18,7 +18,9 @@ class Category extends Model
         'status'
     ];
 
-    public function question()
+    protected $hidden = ['created_at', 'updated_at'];
+
+    public function questions()
     {
         return $this->hasMany(Question::class, 'category_id');
     }

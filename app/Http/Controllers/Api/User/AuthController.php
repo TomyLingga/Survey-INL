@@ -11,30 +11,43 @@ use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
 class AuthController extends Controller
-{   
+{
     public function login(Request $request)
-    {  
-        try{
-            if (! Auth::attempt($request->only('email', 'password'))) {
-                return response()->json(['message' => 'Incorrect email or password','code' => 401], 401);
+    {
+        try {
+            if (!Auth::attempt($request->only('email', 'password'))) {
+                return response()->json(['message' => 'Incorrect email or password', 'code' => 401], 401);
             }
 
             $user = User::where('email', $request->email)->firstOrFail();
 
+            // Check if the user status != 0
+            if ($user->status == 0) {
+                return response()->json(['message' => 'Account is inactive', 'code' => 403], 403);
+            }
+
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                                    'message' => 'Login Successfully',
-                                    'code' => 200, 
-                                    'data' => ['accessToken' => $token,'token_type' => 'Bearer', 'user' => $user]])
-                            ->withHeaders([
-                                'Content-Type' => 'application/json;charset=utf-8',
-                                'Cookie' => 'token='.$token.'; HttpOnly; Max-Age=',
-                                'Access-Control-Allow-Origin' => '*'
+                'message' => 'Login Successfully',
+                'code' => 200,
+                'data' => [
+                    'accessToken' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => $user
+                ]
+            ])->withHeaders([
+                'Content-Type' => 'application/json;charset=utf-8',
+                'Cookie' => 'token='.$token.'; HttpOnly; Max-Age=',
+                'Access-Control-Allow-Origin' => '*'
             ]);
-        }catch (\Illuminate\Database\QueryException $ex) {
-            // var_dump($ex->errorInfo);
-            return response()->json(['info' => 'Login Failed', 'code' => 500], 500);
+        } catch (\Illuminate\Database\QueryException $ex) {
+            return response()->json([
+                'info' => 'Login Failed',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
+                'code' => 500
+            ], 500);
         }
     }
 
@@ -47,7 +60,7 @@ class AuthController extends Controller
 
     public function update_password(Request $request){
         $mail = auth('sanctum')->user()->email;
-    
+
         try {
 
             $validator = Validator::make($request->all(), [
@@ -63,12 +76,12 @@ class AuthController extends Controller
                 'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one symbol, and one number.',
                 'c-password.same' => 'The confirm password must match the password.',
             ]);
-            
+
 
             if ($validator->fails()) {
                 return response()->json([
                     'message' => $validator->errors(),
-                    'success' => false, 
+                    'success' => false,
                     'code' => 400
                 ], 400);
             }
@@ -83,13 +96,15 @@ class AuthController extends Controller
             return response()->json([
                 'data' => $data,
                 'message' => 'Data Updated Successfully',
-                'success' => true, 
+                'success' => true,
                 'code' => 200
             ], 200);
         } catch (\Illuminate\Database\QueryException $ex) {
             return response()->json([
                 'message' => 'Something went wrong',
-                'success' => false, 
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
+                'success' => false,
                 'code' => 500
             ], 500);
         }

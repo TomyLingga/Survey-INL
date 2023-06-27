@@ -19,7 +19,7 @@ class CreateSurveysTable extends Migration
             $table->string('desc');
             $table->date('from');
             $table->date('to');
-            $table->string('status');
+            $table->string('status',15);
             $table->timestamps();
         });
     }

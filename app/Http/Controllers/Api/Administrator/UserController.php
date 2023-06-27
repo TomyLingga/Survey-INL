@@ -45,6 +45,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Something went wrong',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
@@ -76,6 +78,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Something went wrong',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
@@ -129,6 +133,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Failed to create data',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
@@ -157,12 +163,16 @@ class UserController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
             return response()->json([
                 'message' => 'Data not found on record',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 401,
                 'success' => false
             ], 401);
         } catch (\Illuminate\Database\QueryException $ex) {
             return response()->json([
                 'message' => 'Something went wrong',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
@@ -198,6 +208,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Failed to reset password',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
@@ -229,6 +241,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Record not found.',
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 401,
                 'success' => false
             ], 401);
@@ -237,6 +251,8 @@ class UserController extends Controller
 
             return response()->json([
                 'message' => 'Failed to Update',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);

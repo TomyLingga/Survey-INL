@@ -19,7 +19,7 @@ class Answer extends Model
         'answer',
     ];
 
-    public function survey_pertanyaan()
+    public function surveyPertanyaan()
     {
         return $this->belongsTo(SurveyPertanyaan::class, 'survey_pertanyaan_id');
     }
@@ -29,7 +29,7 @@ class Answer extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function extraanswer()
+    public function extraAnswers()
     {
         return $this->hasMany(ExtraAnswer::class, 'answer_id');
     }

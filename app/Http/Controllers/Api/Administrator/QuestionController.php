@@ -25,7 +25,7 @@ class QuestionController extends Controller
     public function index()
     {
         try {
-            $questions = Question::with('category', 'option')->get();
+            $questions = Question::with('category', 'options')->get();
 
             if ($questions->isEmpty()) {
                 return response()->json([
@@ -44,6 +44,8 @@ class QuestionController extends Controller
         } catch (\Illuminate\Database\QueryException $ex) {
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
@@ -54,7 +56,7 @@ class QuestionController extends Controller
     {
         try {
 
-            $question = Question::with('category', 'option')->find($id);
+            $question = Question::with('category', 'options')->find($id);
 
             if (!$question) {
 
@@ -76,6 +78,8 @@ class QuestionController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'success' => false,
                 'code' => 500
             ], 500);
@@ -87,44 +91,11 @@ class QuestionController extends Controller
         return in_array($type, ['radio', 'checkbox', 'dropdown', 'range']);
     }
 
-    // private function validateForm(Request $request)
-    // {
-    //     $rules = [
-    //         'category_id' => 'required',
-    //         'question' => 'required',
-    //         'type' => 'required|in:text,number,file,radio,checkbox,dropdown,range',
-    //         'require' => 'required',
-    //         'value.*' => 'required_if:type,radio,checkbox,dropdown,range',
-    //         'desc.*' => 'required_if:type,radio,checkbox,dropdown,range',
-    //         'extra.*' => 'required_if:type,radio,checkbox,dropdown,range',
-    //     ];
-
-    //     $messages = [
-    //         'category_id.required' => 'The category field is required.',
-    //         'question.required' => 'The question field is required.',
-    //         'type.required' => 'The type field is required.',
-    //         'type.in' => 'Invalid type value. Valid types are: text, number, file, radio, checkbox, dropdown, range.',
-    //         'require.required' => 'The require field is required.',
-    //         'value.*.required_if' => 'The value field is required for the selected question type.',
-    //         'desc.*.required_if' => 'The description field is required for the selected question type.',
-    //         'extra.*.required_if' => 'The extra_answer field is required for the selected question type.',
-    //     ];
-
-    //     // return $this->validate($request, $rules, $messages);
-
-    //     $validator = Validator::make($request->all(), $rules, $messages);
-
-    //     if ($validator->fails()) {
-    //         throw new ValidationException($validator);
-    //     }
-    // }
-
     public function store(Request $request)
     {
         DB::beginTransaction();
 
         try {
-            // $this->validateForm($request);
 
             $validator = Validator::make($request->all(), [
                 'category_id' => 'required',
@@ -189,7 +160,7 @@ class QuestionController extends Controller
                 Option::insert($options);
             }
 
-            $data->load('option');
+            $data->load('options');
 
             DB::commit();
 
@@ -205,6 +176,8 @@ class QuestionController extends Controller
 
             return response()->json([
                 'message' => 'Category not found.',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 401,
                 'success' => false,
             ], 401);
@@ -214,7 +187,8 @@ class QuestionController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
-                'err' => $e,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false,
             ], 500);
@@ -223,11 +197,7 @@ class QuestionController extends Controller
 
     public function update(Request $request, $id)
     {
-        DB::beginTransaction();
-
         try {
-            // $this->validateForm($request);
-
             $validator = Validator::make($request->all(), [
                 'category_id' => 'required',
                 'question' => 'required',
@@ -245,17 +215,19 @@ class QuestionController extends Controller
 
             $category = Category::findOrFail($request->category_id);
 
-            $question = Question::findOrFail($id);
+            $question = Question::with('category', 'options')->findOrFail($id);
 
-            $question->category_id = $request->category_id;
-            $question->question = $request->question;
-            $question->type = $request->type;
-            $question->require = $request->require;
-            $question->status = '1';
-            $question->save();
+            $question->update([
+                'category_id' => $request->category_id,
+                'question' => $request->question,
+                'type' => $request->type,
+                'require' => $request->require,
+                'status' => '1',
+            ]);
 
             if ($this->isMultipleChoice($request->type)) {
                 $validator = Validator::make($request->all(), [
+                    'option_id.*' => 'required',
                     'value.*' => 'required',
                     'desc.*' => 'required',
                     'extra.*' => 'required',
@@ -274,30 +246,30 @@ class QuestionController extends Controller
                 $values = $request->value;
                 $descs = $request->desc;
                 $extras = $request->extra;
+                $optionIds = $request->option_id;
 
                 foreach ($values as $index => $value) {
-                    $array = [
+                    $optionData = [
                         'question_id' => $question->id,
                         'value' => $value,
                         'description' => $descs[$index],
                         'extra_answer' => $extras[$index],
                         'status' => '1',
-                        'created_at' => now(),
                         'updated_at' => now(),
                     ];
 
-                    $options[] = $array;
+                    if (isset($optionIds[$index])) {
+                        Option::where('id', $optionIds[$index])->update($optionData);
+                    } else {
+                        $option = Option::create($optionData);
+                        $question->options()->save($option);
+                    }
                 }
-
-                $question->option()->delete(); // Delete existing options
-                $question->option()->createMany($options); // Insert new options
             } else {
-                $question->option()->delete(); // Delete existing options for non-multiple choice
+                $question->options()->delete();
             }
 
-            $question->load('option');
-
-            DB::commit();
+            $question->load('options');
 
             return response()->json([
                 'data' => $question,
@@ -305,23 +277,27 @@ class QuestionController extends Controller
                 'code' => 200,
                 'success' => true,
             ], 200);
+
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
-            DB::rollback();
             return response()->json([
-                'message' => 'Category not found.',
+                'message' => 'Data not found.',
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 401,
                 'success' => false,
             ], 401);
+
         } catch (\Exception $e) {
-            DB::rollback();
             return response()->json([
                 'message' => $this->messageFail,
-                'err' => $e,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false,
             ], 500);
         }
     }
+
 
     public function toggleActive($id)
     {
@@ -348,6 +324,8 @@ class QuestionController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);

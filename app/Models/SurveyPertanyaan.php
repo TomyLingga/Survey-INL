@@ -16,12 +16,19 @@ class SurveyPertanyaan extends Model
     protected $fillable = [
         'survey_id',
         'order',
-        'chapter',
+        'value',
         'status'
     ];
+
+    protected $hidden = ['created_at', 'updated_at'];
 
     public function survey()
     {
         return $this->belongsTo(Survey::class, 'survey_id');
+    }
+
+    public function questions()
+    {
+        return $this->belongsToMany(Question::class, 'sp-pertanyaans', 'survey_pertanyaan_id', 'question_id');
     }
 }
