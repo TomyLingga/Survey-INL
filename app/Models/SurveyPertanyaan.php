@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Model;
 
 class SurveyPertanyaan extends Model
@@ -30,5 +29,10 @@ class SurveyPertanyaan extends Model
     public function questions()
     {
         return $this->belongsToMany(Question::class, 'sp-pertanyaans', 'survey_pertanyaan_id', 'question_id');
+    }
+
+    public function Answers()
+    {
+        return $this->hasMany(Answer::class, 'survey_pertanyaan_id');
     }
 }

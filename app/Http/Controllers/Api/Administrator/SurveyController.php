@@ -5,15 +5,11 @@ namespace App\Http\Controllers\Api\Administrator;
 use App\Http\Controllers\Controller;
 use App\Models\Survey;
 use App\Models\Question;
-use App\Models\Option;
-use App\Models\Category;
 use App\Models\SurveyPertanyaan;
 use Illuminate\Http\Request;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class SurveyController extends Controller
 {
@@ -66,7 +62,9 @@ class SurveyController extends Controller
                         'questions' => function ($query) {
                             $query->orderBy('category_id')->with('options');
                         },
-                        'questions.category' // Include the category relationship
+                        'questions.category',
+                        'answers',
+                        'answers.extraAnswers'
                     ]);
                 }
             ])->find($id);
@@ -128,13 +126,13 @@ class SurveyController extends Controller
                 'status' => '1',
             ]);
 
-            $orders_sp = $request->order_sp;
+            $ordersSp = $request->order_sp;
             $values = $request->value;
 
             foreach ($values as $index => $arrayValue) {
                 $array = [
                     'survey_id' => $data->id,
-                    'order' => $orders_sp[$index],
+                    'order' => $ordersSp[$index],
                     'value' => $arrayValue,
                     'status' => '1',
                     'created_at' => now(),
@@ -148,14 +146,14 @@ class SurveyController extends Controller
                 $qOrderIndex = explode("|", $questionOrder[$index]);
 
                 if ($sp->order == $qOrderIndex[0]) {
-                    $q_id = explode(",", $qOrderIndex[1]);
+                    $qId = explode(",", $qOrderIndex[1]);
 
-                    $q_id = array_map('intval', $q_id);
+                    $qId = array_map('intval', $qId);
 
                     $counter = 1;
 
-                    foreach ($q_id as $id) {
-                        $question = Question::findOrFail($id);
+                    foreach ($qId as $id) {
+                        Question::findOrFail($id);
                         $sp->questions()->attach($id, ['order' => $counter]);
                         $counter++;
                     }
@@ -216,11 +214,11 @@ class SurveyController extends Controller
             $survey->status = '1';
             $survey->save();
 
-            $orders_sp = $request->order_sp;
+            $ordersSp = $request->order_sp;
             $values = $request->value;
             $surveyPertanyaanId = $request->survey_pertanyaan_id;
 
-            $existingIds = $survey->surveyPertanyaan->pluck('id')->toArray();
+            $existingIds = $survey->surveyPertanyaans->pluck('id')->toArray();
             $deleteIds = array_diff($existingIds, $surveyPertanyaanId);
 
             foreach ($deleteIds as $deleteId) {
@@ -233,7 +231,7 @@ class SurveyController extends Controller
             foreach ($values as $index => $arrayValue) {
                 $array = [
                     'survey_id' => $survey->id,
-                    'order' => $orders_sp[$index],
+                    'order' => $ordersSp[$index],
                     'value' => $arrayValue,
                     'status' => '1',
                     'created_at' => now(),
@@ -254,15 +252,15 @@ class SurveyController extends Controller
                 $qOrderIndex = explode("|", $questionOrder[0]);
 
                 if ($sp->order == $qOrderIndex[0]) {
-                    $q_ids = explode(",", $qOrderIndex[1]);
-                    $q_ids = array_map('intval', $q_ids);
+                    $qIds = explode(",", $qOrderIndex[1]);
+                    $qIds = array_map('intval', $qIds);
 
                     $counter = 1;
 
                     $sp->questions()->detach();
 
-                    foreach ($q_ids as $questionId) {
-                        $question = Question::findOrFail($questionId);
+                    foreach ($qIds as $questionId) {
+                        Question::findOrFail($questionId);
                         $sp->questions()->attach($questionId, ['order' => $counter]);
                         $counter++;
                     }

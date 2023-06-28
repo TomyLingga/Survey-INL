@@ -6,9 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -16,6 +14,13 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class UserController extends Controller
 {
+    private $messageFail = 'Something went wrong';
+    private $messageMissing = 'Data not found in record';
+    private $messageAll = 'Success to Fetch All Datas';
+    private $messageSuccess = 'Success to Fetch Data';
+    private $messageCreate = 'Success to Create Data';
+    private $messageUpdate = 'Success to Update Data';
+
     public function index()
     {
         $limit = request('limit', 10); // default limit is 10 if not provided
@@ -28,7 +33,7 @@ class UserController extends Controller
             if ($data->isEmpty()) {
 
                 return response()->json([
-                    'message' => 'Data not found',
+                    'message' => $this->messageMissing,
                     'success' => true,
                     'code' => 401
                 ], 401);
@@ -36,7 +41,7 @@ class UserController extends Controller
 
             return response()->json([
                 'data' => $data,
-                'message' => 'Success to Fetch All Datas',
+                'message' => $this->messageAll,
                 'success' => true,
                 'code' => 200
             ], 200);
@@ -61,7 +66,7 @@ class UserController extends Controller
             if (!$data) {
 
                 return response()->json([
-                    'message' => 'Data not found in record',
+                    'message' => $this->messageMissing,
                     'success' => true,
                     'code' => 401
                 ], 401);
@@ -69,7 +74,7 @@ class UserController extends Controller
 
             return response()->json([
                 'data' => $data,
-                'message' => 'Success to Fetch All Datas',
+                'message' => $this->messageSuccess,
                 'success' => true,
                 'code' => 200
             ], 200);
@@ -77,7 +82,7 @@ class UserController extends Controller
         }catch (\Illuminate\Database\QueryException $ex) {
 
             return response()->json([
-                'message' => 'Something went wrong',
+                'message' => $this->messageFail,
                 'err' => $ex->getTrace()[0],
                 'errMsg' => $ex->getMessage(),
                 'success' => false,
@@ -114,7 +119,7 @@ class UserController extends Controller
                 ], 409);
             }
 
-            $MasterUser = User::create([
+            $masterUser = User::create([
                 'name'                  => $request->name,
                 'email'                 => $request->email,
                 'password'              => Hash::make('rahasia123'),
@@ -123,8 +128,8 @@ class UserController extends Controller
             ]);
 
             return response()->json([
-                'data' => $MasterUser,
-                'message' => 'Data Created Successfully.',
+                'data' => $masterUser,
+                'message' => $this->messageCreate,
                 'code' => 200,
                 'success' => true
             ], 200);
@@ -132,7 +137,7 @@ class UserController extends Controller
         } catch (QueryException $ex) {
 
             return response()->json([
-                'message' => 'Failed to create data',
+                'message' => $this->messageFail,
                 'err' => $ex->getTrace()[0],
                 'errMsg' => $ex->getMessage(),
                 'code' => 500,
@@ -156,13 +161,13 @@ class UserController extends Controller
 
             return response()->json([
                 'data' => $data,
-                'message' => 'Data Updated Successfully',
+                'message' => $this->messageUpdate,
                 'code' => 200,
                 'success' => true
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
             return response()->json([
-                'message' => 'Data not found on record',
+                'message' => $this->messageMissing,
                 'err' => $ex->getTrace()[0],
                 'errMsg' => $ex->getMessage(),
                 'code' => 401,
@@ -170,7 +175,7 @@ class UserController extends Controller
             ], 401);
         } catch (\Illuminate\Database\QueryException $ex) {
             return response()->json([
-                'message' => 'Something went wrong',
+                'message' => $this->messageFail,
                 'err' => $ex->getTrace()[0],
                 'errMsg' => $ex->getMessage(),
                 'code' => 500,
@@ -188,7 +193,7 @@ class UserController extends Controller
             if (!$data) {
 
                 return response()->json([
-                    'message' => 'Record not found.',
+                    'message' => $this->messageMissing,
                     'code' => 401,
                     'success' => false
                 ], 401);

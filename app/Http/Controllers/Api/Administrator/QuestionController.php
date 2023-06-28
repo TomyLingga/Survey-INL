@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Api\Administrator;
 
 use App\Http\Controllers\Controller;
@@ -7,11 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\Question;
 use App\Models\Option;
 use App\Models\Category;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class QuestionController extends Controller
 {
@@ -74,7 +71,7 @@ class QuestionController extends Controller
                 'code' => 200
             ], 200);
 
-        }catch (\Illuminate\Database\QueryException $ex) {
+        } catch (\Illuminate\Database\QueryException $ex) {
 
             return response()->json([
                 'message' => $this->messageFail,
@@ -112,7 +109,7 @@ class QuestionController extends Controller
                 ], 400);
             }
 
-            $category = Category::findOrFail($request->category_id);
+            Category::findOrFail($request->category_id);
 
             $data = Question::create([
                 'category_id' => $request->category_id,
@@ -213,7 +210,7 @@ class QuestionController extends Controller
                 ], 400);
             }
 
-            $category = Category::findOrFail($request->category_id);
+            Category::findOrFail($request->category_id);
 
             $question = Question::with('category', 'options')->findOrFail($id);
 
@@ -240,8 +237,6 @@ class QuestionController extends Controller
                         'success' => false
                     ], 400);
                 }
-
-                $options = [];
 
                 $values = $request->value;
                 $descs = $request->desc;

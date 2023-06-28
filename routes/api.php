@@ -10,12 +10,12 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/register', [\App\Http\Controllers\Api\User\AuthController::class, 'register']);
 Route::post('/login', [\App\Http\Controllers\Api\User\AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'userMidd'])->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Api\User\AuthController::class, 'logout']);
     Route::post('/update-password', [\App\Http\Controllers\Api\User\AuthController::class, 'update_password']);
 
     //answer
-    Route::post('answer', [App\Http\Controllers\Api\User\AnswerController::class, 'store']);
+    Route::post('answer/{idSurvey}', [App\Http\Controllers\Api\User\AnswerController::class, 'store']);
 });
 
 Route::group(['middleware' => 'levelten.checker'], function () {
@@ -48,4 +48,8 @@ Route::group(['middleware' => 'levelten.checker'], function () {
     Route::post('survey/update/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'update']);
     Route::get('survey/active/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'toggleActive']);
 
+});
+
+Route::fallback(function () {
+    return response()->json(['code' => 401, 'error' => 'Unauthorized'], 401);
 });

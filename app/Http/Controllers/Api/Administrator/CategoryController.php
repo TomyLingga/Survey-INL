@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\Administrator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Category;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Validator;
 
@@ -142,8 +141,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageMissing,
-                'err' => $e->getTrace()[0],
-                'errMsg' => $e->getMessage(),
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 401,
                 'success' => false
             ], 401);
@@ -151,8 +150,8 @@ class CategoryController extends Controller
 
             return response()->json([
                 'message' => $this->messageFail,
-                'err' => $e->getTrace()[0],
-                'errMsg' => $e->getMessage(),
+                'err' => $ex->getTrace()[0],
+                'errMsg' => $ex->getMessage(),
                 'code' => 500,
                 'success' => false
             ], 500);
