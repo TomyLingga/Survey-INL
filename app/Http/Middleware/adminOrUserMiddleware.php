@@ -9,12 +9,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 
-class LevelTenMiddleware
+class adminOrUserMiddleware
 {
-    //User SSO akses lv 10
+    //middleware untuk user dan Admin
     public function handle(Request $request, Closure $next)
     {
-
         $authorizationHeader = $request->header('Authorization');
 
         if (strpos($authorizationHeader, 'Bearer ') !== 0) {
@@ -26,17 +25,15 @@ class LevelTenMiddleware
         try {
             $decoded = JWT::decode($jwt, new Key(env('JWT_SECRET2'), 'HS256'));
 
-            $appId = '7';
+            $appId = 7;
             $urlAkses = "http://36.92.181.10:4763/api/akses/mine/{$appId}/{$decoded->sub}";
 
-            $getakses = Http::withHeaders([
+            $akses = Http::withHeaders([
                 'Authorization' => $authorizationHeader,
-            ])->get($urlAkses);
-
-            $akses = $getakses->json();
+            ])->get($urlAkses)->json();
 
             if (!isset($akses['data']) || $akses['data']['level_akses'] < 10) {
-                return response()->json(['code' => 401, 'error' => 'Don`t have access for this feature'], 401);
+                return response()->json(['code' => 401, 'error' => 'Don\'t have access for this feature'], 401);
             }
 
             if (Carbon::now()->timestamp >= $decoded->exp) {
@@ -46,7 +43,14 @@ class LevelTenMiddleware
             return $next($request);
 
         } catch (\Exception $e) {
-            return response()->json(['code' => 401, 'error' => 'Invalid or expired token'], 401);
+            $user = auth('sanctum')->user();
+
+            if ($user) {
+                return $next($request);
+            }
+
+            return response()->json(['code' => 401, 'error' => 'Unauthorized2'], 401);
         }
+
     }
 }

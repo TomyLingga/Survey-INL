@@ -18,6 +18,17 @@ Route::middleware(['auth:sanctum', 'userMidd'])->group(function () {
     Route::post('answer/{idSurvey}', [App\Http\Controllers\Api\User\AnswerController::class, 'store']);
 });
 
+Route::middleware(['middleware' => 'adminOrUser'])->group(function () {
+    // Survey
+    Route::get('survey', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'index']);
+    Route::get('survey/get/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'show']);
+
+    // Question
+    Route::get('question', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'index']);
+    Route::get('question/get/{id}', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'show']);
+
+});
+
 Route::group(['middleware' => 'levelten.checker'], function () {
     //user
     Route::get('users', [App\Http\Controllers\Api\Administrator\UserController::class, 'index']);
@@ -35,15 +46,11 @@ Route::group(['middleware' => 'levelten.checker'], function () {
     Route::get('category/active/{id}', [App\Http\Controllers\Api\Administrator\CategoryController::class, 'toggleActive']);
 
     //question
-    Route::get('question', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'index']);
-    Route::get('question/get/{id}', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'show']);
     Route::post('question/add', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'store']);
     Route::post('question/update/{id}', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'update']);
     Route::get('question/active/{id}', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'toggleActive']);
 
     //survey
-    Route::get('survey', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'index']);
-    Route::get('survey/get/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'show']);
     Route::post('survey/add', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'store']);
     Route::post('survey/update/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'update']);
     Route::get('survey/active/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'toggleActive']);

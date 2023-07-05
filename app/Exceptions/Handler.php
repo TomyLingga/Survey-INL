@@ -8,14 +8,14 @@ use Throwable;
 
 class Handler extends ExceptionHandler
 {
-    protected function unauthenticated($request, AuthenticationException $ex){
-        return response()->json(['success' => false, 'message' => $ex->getMessage()], 401);
-    }
+    // protected function unauthenticated($request, AuthenticationException $ex){
+    //     return response()->json(['success' => false, 'message' => $ex->getMessage()], 401);
+    // }
 
     public function render($request, Throwable $ex)
     {
         if ($ex instanceof AuthenticationException) {
-            return response()->json(['success' => false, 'message' => $ex->getMessage()], 401);
+            return response()->json(['success' => false,'err' => $ex->getMessage(), 'message' => 'Unauthorized'], 401);
         }
         return parent::render($request, $ex);
     }
