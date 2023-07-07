@@ -15,7 +15,7 @@ Route::middleware(['auth:sanctum', 'userMidd'])->group(function () {
     Route::post('/update-password', [\App\Http\Controllers\Api\User\AuthController::class, 'update_password']);
 
     //answer
-    Route::post('answer/{idSurvey}', [App\Http\Controllers\Api\User\AnswerController::class, 'store']);
+    Route::post('answer/add/{surveyId}', [App\Http\Controllers\Api\User\AnswerController::class, 'store']);
 });
 
 Route::middleware(['middleware' => 'adminOrUser'])->group(function () {
@@ -54,6 +54,10 @@ Route::group(['middleware' => 'levelten.checker'], function () {
     Route::post('survey/add', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'store']);
     Route::post('survey/update/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'update']);
     Route::get('survey/active/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'toggleActive']);
+
+    //answer
+    Route::get('answer/all/{surveyId}', [App\Http\Controllers\Api\User\AnswerController::class, 'getSurveyAnswers']);
+    Route::post('answer/individual/{surveyId}', [App\Http\Controllers\Api\User\AnswerController::class, 'getIndividualSurveyAnswer']);
 
 });
 

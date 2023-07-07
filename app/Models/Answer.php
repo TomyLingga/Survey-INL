@@ -18,6 +18,9 @@ class Answer extends Model
         'answer',
     ];
 
+    protected $hidden = ['updated_at'];
+
+
     public function surveyPertanyaan()
     {
         return $this->belongsTo(SurveyPertanyaan::class, 'survey_pertanyaan_id');

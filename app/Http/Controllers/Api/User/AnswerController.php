@@ -4,26 +4,21 @@ namespace App\Http\Controllers\Api\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
+use App\Models\ExtraAnswer;
 use App\Models\Survey;
+use App\Models\User;
+use App\Models\SurveyPertanyaan;
 use App\Models\Option;
 use App\Models\Question;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class AnswerController extends Controller
 {
-    private $messageFail = 'Something went wrong';
-    private $messageMissing = 'Data not found in record';
-    private $messageSuccess = 'Success to Fetch Data';
-
-    private function isMultipleChoice($type)
-    {
-        return in_array($type, ['radio', 'checkbox', 'dropdown', 'range']);
-    }
-
-    public function store(Request $request, $idSurvey)
+    public function store(Request $request, $surveyId)
     {
         DB::beginTransaction();
 
@@ -40,7 +35,22 @@ class AnswerController extends Controller
                 ], 400);
             }
 
-            $survey = Survey::with('surveyPertanyaans')->findOrFail($idSurvey);
+            $survey = Survey::with('surveyPertanyaans')->findOrFail($surveyId);
+            if (Carbon::now()->isBefore($survey->from)) {
+                return response()->json([
+                    'message' => 'Survey has not started yet.',
+                    'code' => 400,
+                    'success' => false
+                ], 400);
+            }
+
+            if (Carbon::now()->isAfter($survey->to)) {
+                return response()->json([
+                    'message' => 'Survey has ended.',
+                    'code' => 400,
+                    'success' => false
+                ], 400);
+            }
             $userId = Auth::user()->id;
             $createdAnswers = [];
 
@@ -49,7 +59,7 @@ class AnswerController extends Controller
                 $spId = explode("-", $keySp)[1];
                 $surveyPertanyaan = $survey->surveyPertanyaans->where('id', $spId)->first();
 
-                if (!$surveyPertanyaan || $surveyPertanyaan->survey_id != $idSurvey) {
+                if (!$surveyPertanyaan || $surveyPertanyaan->survey_id != $surveyId) {
                     return response()->json([
                         'message' => 'SurveyPertanyaans not found or doesn`t belong to the correct Survey ',
                         'code' => 400,
@@ -143,45 +153,230 @@ class AnswerController extends Controller
         }
     }
 
-    public function index($id)
+    private function isMultipleChoice($type)
     {
-        try {
-            $survey = Survey::with([
-                'surveyPertanyaans' => function ($query) {
-                    $query->orderBy('order')->with([
-                        'questions' => function ($query) {
-                            $query->orderBy('category_id')->with('options');
-                        },
-                        'questions.category',
-                        'answers',
-                        'answers.extraAnswers'
-                    ]);
-                }
-            ])->find($id);
+        return in_array($type, ['radio', 'checkbox', 'dropdown', 'range']);
+    }
 
-            if (!$survey) {
-                return response()->json([
-                    'message' => $this->messageMissing,
-                    'success' => true,
-                    'code' => 401
-                ], 401);
+    public function getIndividualSurveyAnswer(Request $request, $surveyId)
+    {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors(),
+                'code' => 400,
+                'success' => false
+            ], 400);
+        }
+
+        $userId = $request->user_id;
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        $survey = Survey::find($surveyId);
+
+        if (!$survey) {
+            return response()->json(['error' => 'Survey not found'], 404);
+        }
+
+        $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
+
+        $surveyPertanyaanResponses = [];
+
+        foreach ($surveyPertanyaans as $surveyPertanyaan) {
+            $answerPairs = json_decode($surveyPertanyaan->answers, true);
+
+            $filteredAnswerPairs = array_filter($answerPairs, function ($answerPair) use ($userId) {
+                return $answerPair['user_id'] == $userId;
+            });
+
+            $surveyPertanyaanId = $surveyPertanyaan->id;
+            $surveyPertanyaanValue = $surveyPertanyaan->value;
+
+            $questions = $this->getValueOfAnswer($filteredAnswerPairs);
+
+            $combinedQuestions = [];
+            foreach ($questions as $question) {
+                $questionId = $question['questionId'];
+                $questionValue = $question['questionValue'];
+                $answers = $question['answers'];
+
+                if (!isset($combinedQuestions[$questionId])) {
+                    $combinedQuestions[$questionId] = [
+                        'questionId' => $questionId,
+                        'questionValue' => $questionValue,
+                        'answers' => [$answers],
+                    ];
+                } else {
+                    $combinedQuestions[$questionId]['answers'][] = $answers;
+                }
             }
 
-            return response()->json([
-                'survey' => $survey,
-                'message' => $this->messageSuccess,
-                'success' => true,
-                'code' => 200
-            ], 200);
-
-        } catch (\Illuminate\Database\QueryException $e) {
-            return response()->json([
-                'message' => $this->messageFail,
-                'err' => $e->getTrace()[0],
-                'errMsg' => $e->getMessage(),
-                'success' => false,
-                'code' => 500
-            ], 500);
+            $surveyPertanyaanResponses[] = [
+                'id' => $surveyPertanyaanId,
+                'value' => $surveyPertanyaanValue,
+                'questions' => array_values($combinedQuestions),
+            ];
         }
+
+        $response = [
+            'survey' => $survey,
+            'survey_pertanyaans' => $surveyPertanyaanResponses,
+        ];
+
+        return response()->json($response);
+    }
+
+    public function getSurveyAnswers($surveyId)
+    {
+        $survey = Survey::find($surveyId);
+
+        if (!$survey) {
+            return response()->json(['error' => 'Survey not found'], 404);
+        }
+
+        $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
+
+        $surveyPertanyaanResponses = [];
+
+        foreach ($surveyPertanyaans as $surveyPertanyaan) {
+            $answerPairs = json_decode($surveyPertanyaan->answers, true);
+
+            $surveyPertanyaanId = $surveyPertanyaan->id;
+            $surveyPertanyaanValue = $surveyPertanyaan->value;
+
+            $questions = $this->getValueOfAnswer($answerPairs);
+
+            // dd($questions);
+            $combinedQuestions = [];
+            foreach ($questions as $question) {
+                $questionId = $question['questionId'];
+                $questionValue = $question['questionValue'];
+                $answers = $question['answers'];
+
+                if (!isset($combinedQuestions[$questionId])) {
+                    $arraySementara = [
+                        'questionId' => $questionId,
+                        'questionValue' => $questionValue,
+                        'answers' => [$answers],
+                        'persentasi' => isset($question['persentasi']) ? $question['persentasi']:null
+                    ];
+                    $combinedQuestions[$questionId] = $arraySementara;
+                } else {
+                    $combinedQuestions[$questionId]['answers'][] = $answers;
+                }
+            }
+
+            $surveyPertanyaanResponses[] = [
+                'id' => $surveyPertanyaanId,
+                'value' => $surveyPertanyaanValue,
+                'questions' => array_values($combinedQuestions),
+                // 'percentages' => array_values
+            ];
+        }
+
+        $response = [
+            'survey' => $survey,
+            'survey_pertanyaans' => $surveyPertanyaanResponses,
+        ];
+
+        return response()->json($response);
+    }
+
+    private function getValueOfAnswer($answerPairs)
+    {
+        $questions = [];
+
+        foreach ($answerPairs as $answerPair) {
+            $answerId = $answerPair['id'];
+            $answer = $answerPair['answer'];
+            $answers = explode(';', $answer);
+            $surveyPertanyaanId = $answerPair['survey_pertanyaan_id'];
+
+            foreach ($answers as $answer) {
+                $parts = explode('|', $answer);
+                $questionId = $parts[0];
+                $answerValue = $parts[1];
+
+                $question = Question::find($questionId);
+                $questionText = $question->question;
+                $questionType = $question->type;
+
+                if ($this->isMultipleChoice($questionType)) {
+                    $questionOptions = Option::where('question_id', $questionId)->get();
+                    $totalAnswersCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)->count();
+                    // dd($totalAnswersCount);
+
+                    $selectedOption = Option::find($answerValue);
+                    $selectedOptionId = $selectedOption->id;
+                    $selectedOptionValue = $selectedOption->value;
+                    $selectedOptionDescription = $selectedOption->description;
+
+                    $extraAnswers = ExtraAnswer::where('answer_id', $answerId)
+                        ->where('option_id', $selectedOptionId)
+                        ->first();
+
+                    $answerValue = [
+                        'id' => $answerId,
+                        'optionId' => $selectedOptionId,
+                        'value' => $selectedOptionValue,
+                        'description' => $selectedOptionDescription,
+                        'extraAnswers' => $extraAnswers,
+                    ];
+
+                    $percentageResults = [];
+
+                    if (count($answerPairs) > 1) {
+                        foreach ($questionOptions as $questionOption) {
+                            $optionId = $questionOption->id;
+
+                            $answerCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)
+                                ->where('answer', 'ILIKE', "%$questionId|$optionId%")
+                                ->count();
+
+                                // dd($optionId, $answerCount);
+
+                            $optionPercentage = $totalAnswersCount > 0 ? ($answerCount / $totalAnswersCount) * 100 : 0;
+
+                            $percentageResults[] = [
+                                'optionId' => $optionId,
+                                'percentage' => $optionPercentage,
+                            ];
+                        }
+                    }
+
+                    $questions[] = [
+                        'questionId' => $questionId,
+                        'questionValue' => $questionText,
+                        'answers' => $answerValue,
+                        'persentasi' => $percentageResults,
+                    ];
+
+                } else {
+                    $answerValue = [
+                        'id' => $answerId,
+                        'optionId' => null,
+                        'value' => $answerValue,
+                        'description' => $answerValue,
+                        'extraAnswers' => null,
+                    ];
+
+                    $questions[] = [
+                        'questionId' => $questionId,
+                        'questionValue' => $questionText,
+                        'answers' => $answerValue,
+                    ];
+                }
+            }
+        }
+
+        return $questions;
+
     }
 }
