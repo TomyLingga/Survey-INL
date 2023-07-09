@@ -35,4 +35,9 @@ class SurveyPertanyaan extends Model
     {
         return $this->hasMany(Answer::class, 'survey_pertanyaan_id');
     }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
 }

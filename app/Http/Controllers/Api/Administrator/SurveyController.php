@@ -60,11 +60,8 @@ class SurveyController extends Controller
                 'surveyPertanyaans' => function ($query) {
                     $query->orderBy('order')->with([
                         'questions' => function ($query) {
-                            $query->orderBy('category_id')->with('options');
-                        },
-                        'questions.category',
-                        'answers',
-                        'answers.extraAnswers'
+                            $query->orderBy('order')->with('options');
+                        }
                     ]);
                 }
             ])->find($id);

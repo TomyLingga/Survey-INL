@@ -87,18 +87,34 @@ class AnswerController extends Controller
                     $questionData = Question::findOrFail($answer[0]);
 
                     if ($this->isMultipleChoice($questionData->type)) {
-                        $option = Option::findOrFail($answer[1]);
+                        $optionIds = explode("~", $answer[1]);
 
-                        if ($option->extra_answer == 1) {
-                            $dataNews = [];
-                            foreach ($valueSp["extra"] as $keyExtra => $valueExtra) {
+                        foreach ($optionIds as $optionId) {
+                            $option = Option::where('id', $optionId)
+                                    ->where('question_id', $questionData->id)
+                                    ->first();
 
-                                $extraId = explode("-", $keyExtra)[1];
+                            if (!$option) {
 
-                                $dataNews[] = [$extraId, $valueExtra];
+                                return response()->json([
+                                    'message' => 'Option not found or doesn`t belong to the correct Question',
+                                    'error' => "Option ID $optionId doesn't belong to the Question ID $questionData->id",
+                                    'code' => 400,
+                                    'success' => false
+                                ], 400);
                             }
 
-                            $arrayExtraAnswers = $dataNews;
+                            if ($option->extra_answer == 1) {
+                                $dataNews = [];
+                                foreach ($valueSp["extra"] as $keyExtra => $valueExtra) {
+
+                                    $extraId = explode("-", $keyExtra)[1];
+
+                                    $dataNews[] = [$extraId, $valueExtra];
+                                }
+
+                                $arrayExtraAnswers = $dataNews;
+                            }
                         }
                     }
                 }
@@ -158,6 +174,11 @@ class AnswerController extends Controller
         return in_array($type, ['radio', 'checkbox', 'dropdown', 'range']);
     }
 
+    private function multipleChoiceExceptCheckbox($type)
+    {
+        return in_array($type, ['radio', 'dropdown', 'range']);
+    }
+
     public function getIndividualSurveyAnswer(Request $request, $surveyId)
     {
         $validator = Validator::make($request->all(), [
@@ -195,6 +216,10 @@ class AnswerController extends Controller
             $filteredAnswerPairs = array_filter($answerPairs, function ($answerPair) use ($userId) {
                 return $answerPair['user_id'] == $userId;
             });
+
+            if (!$filteredAnswerPairs) {
+                return response()->json(['error' => 'This user not yet answer this Survey'], 404);
+            }
 
             $surveyPertanyaanId = $surveyPertanyaan->id;
             $surveyPertanyaanValue = $surveyPertanyaan->value;
@@ -237,56 +262,80 @@ class AnswerController extends Controller
     {
         $survey = Survey::find($surveyId);
 
-        if (!$survey) {
-            return response()->json(['error' => 'Survey not found'], 404);
-        }
+    if (!$survey) {
+        return response()->json(['error' => 'Survey not found'], 404);
+    }
 
-        $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
+    $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
+    $surveyPertanyaanResponses = [];
 
-        $surveyPertanyaanResponses = [];
+    $totalAverage = 0;
+    $totalCount = 0;
 
-        foreach ($surveyPertanyaans as $surveyPertanyaan) {
-            $answerPairs = json_decode($surveyPertanyaan->answers, true);
+    foreach ($surveyPertanyaans as $surveyPertanyaan) {
+        $answerPairs = json_decode($surveyPertanyaan->answers, true);
+        $surveyPertanyaanId = $surveyPertanyaan->id;
+        $surveyPertanyaanValue = $surveyPertanyaan->value;
 
-            $surveyPertanyaanId = $surveyPertanyaan->id;
-            $surveyPertanyaanValue = $surveyPertanyaan->value;
+        $questions = $this->getValueOfAnswer($answerPairs);
 
-            $questions = $this->getValueOfAnswer($answerPairs);
+        $combinedQuestions = [];
 
-            // dd($questions);
-            $combinedQuestions = [];
-            foreach ($questions as $question) {
-                $questionId = $question['questionId'];
-                $questionValue = $question['questionValue'];
-                $answers = $question['answers'];
+        foreach ($questions as $question) {
+            $questionId = $question['questionId'];
+            $questionValue = $question['questionValue'];
+            $questionType = $question['questionType'];
+            $answers = $question['answers'];
 
-                if (!isset($combinedQuestions[$questionId])) {
-                    $arraySementara = [
-                        'questionId' => $questionId,
-                        'questionValue' => $questionValue,
-                        'answers' => [$answers],
-                        'persentasi' => isset($question['persentasi']) ? $question['persentasi']:null
-                    ];
-                    $combinedQuestions[$questionId] = $arraySementara;
-                } else {
-                    $combinedQuestions[$questionId]['answers'][] = $answers;
-                }
+            if (!isset($combinedQuestions[$questionId])) {
+                $arraySementara = [
+                    'questionId' => $questionId,
+                    'questionType' => $questionType,
+                    'questionValue' => $questionValue,
+                    'answers' => [$answers],
+                    'persentasi' => isset($question['persentasi']) ? $question['persentasi'] : null
+                ];
+                $combinedQuestions[$questionId] = $arraySementara;
+            } else {
+                $combinedQuestions[$questionId]['answers'][] = $answers;
             }
-
-            $surveyPertanyaanResponses[] = [
-                'id' => $surveyPertanyaanId,
-                'value' => $surveyPertanyaanValue,
-                'questions' => array_values($combinedQuestions),
-                // 'percentages' => array_values
-            ];
         }
 
-        $response = [
-            'survey' => $survey,
-            'survey_pertanyaans' => $surveyPertanyaanResponses,
-        ];
+        foreach ($combinedQuestions as &$combinedQuestion) {
+            if ($combinedQuestion['questionType'] === 'range') {
+                $questionId = $combinedQuestion['questionId'];
+                $questionValueSum = 0;
+                $questionValueCount = count($combinedQuestion['answers']);
 
-        return response()->json($response);
+                foreach ($combinedQuestion['answers'] as $answer) {
+                    $questionValueSum += $answer['value'];
+                }
+
+                $averageQuestionValue = $questionValueCount > 0 ? $questionValueSum / $questionValueCount : 0;
+                $roundedAverageQuestionValue = round($averageQuestionValue, 0, PHP_ROUND_HALF_UP);
+                $combinedQuestion['averageQuestionValue'] = $roundedAverageQuestionValue;
+
+                $totalAverage += $roundedAverageQuestionValue;
+                $totalCount++;
+            }
+        }
+
+        $surveyPertanyaanResponses[] = [
+            'id' => $surveyPertanyaanId,
+            'value' => $surveyPertanyaanValue,
+            'questions' => array_values($combinedQuestions),
+        ];
+    }
+
+    $surveyAverage = $totalCount > 0 ? $totalAverage / $totalCount : 0;
+
+    $response = [
+        'survey' => $survey,
+        'survey_pertanyaans' => $surveyPertanyaanResponses,
+        'averageValue' => $surveyAverage,
+    ];
+
+    return response()->json($response);
     }
 
     private function getValueOfAnswer($answerPairs)
@@ -304,6 +353,8 @@ class AnswerController extends Controller
                 $questionId = $parts[0];
                 $answerValue = $parts[1];
 
+                $percentageResults = [];
+
                 $question = Question::find($questionId);
                 $questionText = $question->question;
                 $questionType = $question->type;
@@ -311,53 +362,57 @@ class AnswerController extends Controller
                 if ($this->isMultipleChoice($questionType)) {
                     $questionOptions = Option::where('question_id', $questionId)->get();
                     $totalAnswersCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)->count();
-                    // dd($totalAnswersCount);
+                    $multiCheckboxValues = explode("~", $answerValue);
 
-                    $selectedOption = Option::find($answerValue);
-                    $selectedOptionId = $selectedOption->id;
-                    $selectedOptionValue = $selectedOption->value;
-                    $selectedOptionDescription = $selectedOption->description;
+                    foreach ($multiCheckboxValues as $multiCheckboxValue) {
+                        $selectedOption = Option::find($multiCheckboxValue);
+                        $selectedOptionId = $selectedOption->id;
+                        $selectedOptionValue = $selectedOption->value;
+                        $selectedOptionDescription = $selectedOption->description;
 
-                    $extraAnswers = ExtraAnswer::where('answer_id', $answerId)
-                        ->where('option_id', $selectedOptionId)
-                        ->first();
+                        $extraAnswers = ExtraAnswer::where('answer_id', $answerId)
+                            ->where('option_id', $selectedOptionId)
+                            ->first();
 
-                    $answerValue = [
-                        'id' => $answerId,
-                        'optionId' => $selectedOptionId,
-                        'value' => $selectedOptionValue,
-                        'description' => $selectedOptionDescription,
-                        'extraAnswers' => $extraAnswers,
-                    ];
+                        $multiCheckboxValue = [
+                            'id' => $answerId,
+                            'optionId' => $selectedOptionId,
+                            'value' => $selectedOptionValue,
+                            'description' => $selectedOptionDescription,
+                            'extraAnswers' => $extraAnswers,
+                        ];
 
-                    $percentageResults = [];
+                        if ($this->multipleChoiceExceptCheckbox($questionType)) {
+                            foreach ($questionOptions as $questionOption) {
+                                $optionId = $questionOption->id;
 
-                    if (count($answerPairs) > 1) {
-                        foreach ($questionOptions as $questionOption) {
-                            $optionId = $questionOption->id;
+                                if ($answer === end($answers)) {
+                                    $answerCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)
+                                        ->where('answer', 'ILIKE', "%$questionId|$optionId")
+                                        ->count();
+                                } else {
+                                    $answerCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)
+                                        ->where('answer', 'ILIKE', "%$questionId|$optionId;%")
+                                        ->count();
+                                }
 
-                            $answerCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)
-                                ->where('answer', 'ILIKE', "%$questionId|$optionId%")
-                                ->count();
+                                $optionPercentage = $totalAnswersCount > 0 ? ($answerCount / $totalAnswersCount) * 100 : 0;
 
-                                // dd($optionId, $answerCount);
-
-                            $optionPercentage = $totalAnswersCount > 0 ? ($answerCount / $totalAnswersCount) * 100 : 0;
-
-                            $percentageResults[] = [
-                                'optionId' => $optionId,
-                                'percentage' => $optionPercentage,
-                            ];
+                                $percentageResults[] = [
+                                    'optionId' => $optionId,
+                                    'percentage' => $optionPercentage,
+                                ];
+                            }
                         }
+
+                        $questions[] = [
+                            'questionId' => $questionId,
+                            'questionValue' => $questionText,
+                            'questionType' => $questionType,
+                            'answers' => $multiCheckboxValue,
+                            'persentasi' => $percentageResults,
+                        ];
                     }
-
-                    $questions[] = [
-                        'questionId' => $questionId,
-                        'questionValue' => $questionText,
-                        'answers' => $answerValue,
-                        'persentasi' => $percentageResults,
-                    ];
-
                 } else {
                     $answerValue = [
                         'id' => $answerId,
@@ -370,6 +425,7 @@ class AnswerController extends Controller
                     $questions[] = [
                         'questionId' => $questionId,
                         'questionValue' => $questionText,
+                        'questionType' => $questionType,
                         'answers' => $answerValue,
                     ];
                 }
@@ -377,6 +433,5 @@ class AnswerController extends Controller
         }
 
         return $questions;
-
     }
 }

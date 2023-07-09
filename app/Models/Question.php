@@ -35,6 +35,6 @@ class Question extends Model
 
     public function surveyPertanyaans()
     {
-        return $this->belongsToMany(SurveyPertanyaan::class);
+        return $this->belongsToMany(SurveyPertanyaan::class, 'sp-pertanyaans', 'survey_pertanyaan_id', 'question_id');
     }
 }
