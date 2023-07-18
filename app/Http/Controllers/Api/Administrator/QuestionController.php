@@ -22,7 +22,7 @@ class QuestionController extends Controller
     public function index()
     {
         try {
-            $questions = Question::with('category', 'options')->get();
+            $questions = Question::with('options')->get();
 
             if ($questions->isEmpty()) {
                 return response()->json([
@@ -53,7 +53,7 @@ class QuestionController extends Controller
     {
         try {
 
-            $question = Question::with('category', 'options')->find($id);
+            $question = Question::with('options')->find($id);
 
             if (!$question) {
 
@@ -95,7 +95,6 @@ class QuestionController extends Controller
         try {
 
             $validator = Validator::make($request->all(), [
-                'category_id' => 'required',
                 'question' => 'required',
                 'type' => 'required|in:text,number,file,radio,checkbox,dropdown,range',
                 'require' => 'required',
@@ -109,10 +108,8 @@ class QuestionController extends Controller
                 ], 400);
             }
 
-            Category::findOrFail($request->category_id);
-
             $data = Question::create([
-                'category_id' => $request->category_id,
+                'category_id' => '1',
                 'question' => $request->question,
                 'type' => $request->type,
                 'require' => $request->require,
@@ -196,7 +193,6 @@ class QuestionController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'category_id' => 'required',
                 'question' => 'required',
                 'type' => 'required|in:text,number,file,radio,checkbox,dropdown,range',
                 'require' => 'required',
@@ -210,12 +206,10 @@ class QuestionController extends Controller
                 ], 400);
             }
 
-            Category::findOrFail($request->category_id);
-
-            $question = Question::with('category', 'options')->findOrFail($id);
+            $question = Question::with('options')->findOrFail($id);
 
             $question->update([
-                'category_id' => $request->category_id,
+                'category_id' => '1',
                 'question' => $request->question,
                 'type' => $request->type,
                 'require' => $request->require,
