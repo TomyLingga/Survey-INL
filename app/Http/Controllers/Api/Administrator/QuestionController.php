@@ -237,6 +237,9 @@ class QuestionController extends Controller
                 $extras = $request->extra;
                 $optionIds = $request->option_id;
 
+                // Step 1: Retrieve the existing option IDs associated with the question.
+                $existingOptionIds = $question->options->pluck('id')->toArray();
+
                 foreach ($values as $index => $value) {
                     $optionData = [
                         'question_id' => $question->id,
@@ -249,11 +252,14 @@ class QuestionController extends Controller
 
                     if (isset($optionIds[$index])) {
                         Option::where('id', $optionIds[$index])->update($optionData);
+                        $existingOptionIds = array_diff($existingOptionIds, [$optionIds[$index]]);
                     } else {
                         $option = Option::create($optionData);
                         $question->options()->save($option);
                     }
                 }
+
+                Option::whereIn('id', $existingOptionIds)->delete();
             } else {
                 $question->options()->delete();
             }
