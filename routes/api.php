@@ -22,6 +22,8 @@ Route::middleware(['middleware' => 'adminOrUser'])->group(function () {
     // Survey
     Route::get('survey', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'index']);
     Route::get('survey/get/{id}', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'show']);
+    Route::get('survey/avaliable', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'indexAvaliable']);
+    Route::get('survey/answered', [App\Http\Controllers\Api\Administrator\SurveyController::class, 'indexAnswered']);
 
     // Question
     Route::get('question', [App\Http\Controllers\Api\Administrator\QuestionController::class, 'index']);

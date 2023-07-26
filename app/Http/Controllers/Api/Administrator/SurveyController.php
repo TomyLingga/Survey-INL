@@ -53,6 +53,79 @@ class SurveyController extends Controller
         }
     }
 
+    public function indexAvaliable()
+    {
+        try {
+            $today = now()->toDateString();
+            $surveys = Survey::where('from', '<=', $today)
+                                ->where('to', '>=', $today)
+                                ->with(['surveyPertanyaans' => function ($query) {
+                                    $query->orderBy('order');
+                                }])->get();
+
+            if ($surveys->isEmpty()) {
+
+                return response()->json([
+                    'message' => $this->messageMissing,
+                    'success' => true,
+                    'code' => 401
+                ], 401);
+            }
+
+            return response()->json([
+                'data' => $surveys,
+                'message' => $this->messageAll,
+                'success' => true,
+                'code' => 200
+            ], 200);
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'success' => false,
+                'code' => 500
+            ], 500);
+        }
+    }
+
+    public function indexAnswered()
+    {
+        try {
+            $userId = auth('sanctum')->user()->id;
+
+            $surveys = Survey::whereHas('surveyPertanyaans.Answers', function ($query) use ($userId) {
+                                    $query->where('user_id', $userId);
+                                })->with(['surveyPertanyaans' => function ($query) {
+                                    $query->orderBy('order');
+                                }])->get();
+
+            if ($surveys->isEmpty()) {
+
+                return response()->json([
+                    'message' => $this->messageMissing,
+                    'success' => true,
+                    'code' => 401
+                ], 401);
+            }
+
+            return response()->json([
+                'data' => $surveys,
+                'message' => $this->messageAll,
+                'success' => true,
+                'code' => 200
+            ], 200);
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json([
+                'message' => $this->messageFail,
+                'err' => $e->getTrace()[0],
+                'errMsg' => $e->getMessage(),
+                'success' => false,
+                'code' => 500
+            ], 500);
+        }
+    }
+
     public function show($id)
     {
         try {
