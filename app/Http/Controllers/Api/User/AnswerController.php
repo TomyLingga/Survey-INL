@@ -262,80 +262,81 @@ class AnswerController extends Controller
     {
         $survey = Survey::find($surveyId);
 
-    if (!$survey) {
-        return response()->json(['error' => 'Survey not found'], 404);
-    }
-
-    $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
-    $surveyPertanyaanResponses = [];
-
-    $totalAverage = 0;
-    $totalCount = 0;
-
-    foreach ($surveyPertanyaans as $surveyPertanyaan) {
-        $answerPairs = json_decode($surveyPertanyaan->answers, true);
-        $surveyPertanyaanId = $surveyPertanyaan->id;
-        $surveyPertanyaanValue = $surveyPertanyaan->value;
-
-        $questions = $this->getValueOfAnswer($answerPairs);
-
-        $combinedQuestions = [];
-
-        foreach ($questions as $question) {
-            $questionId = $question['questionId'];
-            $questionValue = $question['questionValue'];
-            $questionType = $question['questionType'];
-            $answers = $question['answers'];
-
-            if (!isset($combinedQuestions[$questionId])) {
-                $arraySementara = [
-                    'questionId' => $questionId,
-                    'questionType' => $questionType,
-                    'questionValue' => $questionValue,
-                    'answers' => [$answers],
-                    'persentasi' => isset($question['persentasi']) ? $question['persentasi'] : null
-                ];
-                $combinedQuestions[$questionId] = $arraySementara;
-            } else {
-                $combinedQuestions[$questionId]['answers'][] = $answers;
-            }
+        if (!$survey) {
+            return response()->json(['error' => 'Survey not found'], 404);
         }
 
-        foreach ($combinedQuestions as &$combinedQuestion) {
-            if ($combinedQuestion['questionType'] === 'range') {
-                $questionId = $combinedQuestion['questionId'];
-                $questionValueSum = 0;
-                $questionValueCount = count($combinedQuestion['answers']);
+        $surveyPertanyaans = SurveyPertanyaan::where('survey_id', $surveyId)->orderBy('order')->get();
+        $surveyPertanyaanResponses = [];
 
-                foreach ($combinedQuestion['answers'] as $answer) {
-                    $questionValueSum += $answer['value'];
+        $totalAverage = 0;
+        $totalCount = 0;
+
+        foreach ($surveyPertanyaans as $surveyPertanyaan) {
+            $answerPairs = json_decode($surveyPertanyaan->answers, true);
+            $surveyPertanyaanId = $surveyPertanyaan->id;
+            $surveyPertanyaanValue = $surveyPertanyaan->value;
+
+            $questions = $this->getValueOfAnswer($answerPairs);
+
+            $combinedQuestions = [];
+
+            foreach ($questions as $question) {
+                $questionId = $question['questionId'];
+                $questionValue = $question['questionValue'];
+                $questionType = $question['questionType'];
+                $answers = $question['answers'];
+
+                if (!isset($combinedQuestions[$questionId])) {
+                    $arraySementara = [
+                        'questionId' => $questionId,
+                        'questionType' => $questionType,
+                        'questionValue' => $questionValue,
+                        'answers' => [$answers],
+                        'persentasi' => isset($question['persentasi']) ? $question['persentasi'] : null
+                    ];
+                    $combinedQuestions[$questionId] = $arraySementara;
+                } else {
+                    $combinedQuestions[$questionId]['answers'][] = $answers;
                 }
-
-                $averageQuestionValue = $questionValueCount > 0 ? $questionValueSum / $questionValueCount : 0;
-                $roundedAverageQuestionValue = round($averageQuestionValue, 0, PHP_ROUND_HALF_UP);
-                $combinedQuestion['averageQuestionValue'] = $roundedAverageQuestionValue;
-
-                $totalAverage += $roundedAverageQuestionValue;
-                $totalCount++;
             }
+
+            dd($combinedQuestions);
+            foreach ($combinedQuestions as &$combinedQuestion) {
+                if ($combinedQuestion['questionType'] === 'range') {
+                    $questionId = $combinedQuestion['questionId'];
+                    $questionValueSum = 0;
+                    $questionValueCount = count($combinedQuestion['answers']);
+
+                    foreach ($combinedQuestion['answers'] as $answer) {
+                        $questionValueSum += $answer['value'];
+                    }
+
+                    $averageQuestionValue = $questionValueCount > 0 ? $questionValueSum / $questionValueCount : 0;
+                    $roundedAverageQuestionValue = round($averageQuestionValue, 0, PHP_ROUND_HALF_UP);
+                    $combinedQuestion['averageQuestionValue'] = $roundedAverageQuestionValue;
+
+                    $totalAverage += $roundedAverageQuestionValue;
+                    $totalCount++;
+                }
+            }
+
+            $surveyPertanyaanResponses[] = [
+                'id' => $surveyPertanyaanId,
+                'value' => $surveyPertanyaanValue,
+                'questions' => array_values($combinedQuestions),
+            ];
         }
 
-        $surveyPertanyaanResponses[] = [
-            'id' => $surveyPertanyaanId,
-            'value' => $surveyPertanyaanValue,
-            'questions' => array_values($combinedQuestions),
+        $surveyAverage = $totalCount > 0 ? $totalAverage / $totalCount : 0;
+
+        $response = [
+            'survey' => $survey,
+            'survey_pertanyaans' => $surveyPertanyaanResponses,
+            'averageValue' => $surveyAverage,
         ];
-    }
 
-    $surveyAverage = $totalCount > 0 ? $totalAverage / $totalCount : 0;
-
-    $response = [
-        'survey' => $survey,
-        'survey_pertanyaans' => $surveyPertanyaanResponses,
-        'averageValue' => $surveyAverage,
-    ];
-
-    return response()->json($response);
+        return response()->json($response);
     }
 
     private function getValueOfAnswer($answerPairs)
@@ -385,6 +386,7 @@ class AnswerController extends Controller
                         if ($this->multipleChoiceExceptCheckbox($questionType)) {
                             foreach ($questionOptions as $questionOption) {
                                 $optionId = $questionOption->id;
+                                $optionText = $questionOption->description;
 
                                 if ($answer === end($answers)) {
                                     $answerCount = Answer::where('survey_pertanyaan_id', $surveyPertanyaanId)
@@ -400,6 +402,7 @@ class AnswerController extends Controller
 
                                 $percentageResults[] = [
                                     'optionId' => $optionId,
+                                    'optionText' => $optionText,
                                     'percentage' => $optionPercentage,
                                 ];
                             }

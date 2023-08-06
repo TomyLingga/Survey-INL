@@ -21,7 +21,7 @@ class CategoryController extends Controller
     public function index()
     {
         try {
-            $categories = Category::with('questions')->get();
+            $categories = Category::get();
 
             if ($categories->isEmpty()) {
 
@@ -52,7 +52,7 @@ class CategoryController extends Controller
     public function show($id)
     {
         try {
-            $data = Category::with('questions')->find($id);
+            $data = Category::find($id);
 
             if (!$data) {
 
