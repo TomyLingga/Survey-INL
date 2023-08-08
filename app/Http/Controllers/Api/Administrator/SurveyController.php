@@ -58,7 +58,7 @@ class SurveyController extends Controller
         try {
             $today = now()->toDateString();
             $surveys = Survey::where('from', '<=', $today)
-                                ->where('to', '>=', $today)
+                                ->where('to', '>', $today)
                                 ->where('status', '!=', '0')
                                 ->with(['surveyPertanyaans' => function ($query) {
                                     $query->orderBy('order');
