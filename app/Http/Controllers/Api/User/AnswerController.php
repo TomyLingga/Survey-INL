@@ -279,6 +279,7 @@ class AnswerController extends Controller
 
             $questions = $this->getValueOfAnswer($answerPairs);
 
+            // dd($questions);
             $combinedQuestions = [];
 
             foreach ($questions as $question) {
@@ -301,7 +302,6 @@ class AnswerController extends Controller
                 }
             }
 
-            dd($combinedQuestions);
             foreach ($combinedQuestions as &$combinedQuestion) {
                 if ($combinedQuestion['questionType'] === 'range') {
                     $questionId = $combinedQuestion['questionId'];
@@ -345,6 +345,11 @@ class AnswerController extends Controller
 
         foreach ($answerPairs as $answerPair) {
             $answerId = $answerPair['id'];
+            $answerUserId = $answerPair['user_id'];
+
+            $user = User::find($answerUserId);
+            $userName = $user->name;
+
             $answer = $answerPair['answer'];
             $answers = explode(';', $answer);
             $surveyPertanyaanId = $answerPair['survey_pertanyaan_id'];
@@ -377,6 +382,7 @@ class AnswerController extends Controller
 
                         $multiCheckboxValue = [
                             'id' => $answerId,
+                            'user_name' => $userName,
                             'optionId' => $selectedOptionId,
                             'value' => $selectedOptionValue,
                             'description' => $selectedOptionDescription,
@@ -419,6 +425,7 @@ class AnswerController extends Controller
                 } else {
                     $answerValue = [
                         'id' => $answerId,
+                        'User_name' => $userName,
                         'optionId' => null,
                         'value' => $answerValue,
                         'description' => $answerValue,
