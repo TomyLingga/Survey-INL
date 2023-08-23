@@ -425,7 +425,7 @@ class AnswerController extends Controller
                 } else {
                     $answerValue = [
                         'id' => $answerId,
-                        'User_name' => $userName,
+                        'user_name' => $userName,
                         'optionId' => null,
                         'value' => $answerValue,
                         'description' => $answerValue,
