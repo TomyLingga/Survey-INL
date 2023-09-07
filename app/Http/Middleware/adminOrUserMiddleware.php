@@ -25,12 +25,14 @@ class adminOrUserMiddleware
         try {
             $decoded = JWT::decode($jwt, new Key(env('JWT_SECRET2'), 'HS256'));
 
-            $appId = 7;
+            $appId = '7';
             $urlAkses = "http://36.92.181.10:4763/api/akses/mine/{$appId}/{$decoded->sub}";
 
             $akses = Http::withHeaders([
                 'Authorization' => $authorizationHeader,
             ])->get($urlAkses)->json();
+
+            dd($akses);
 
             if (!isset($akses['data']) || $akses['data']['level_akses'] < 10) {
                 return response()->json(['code' => 401, 'error' => 'Don\'t have access for this feature'], 401);
