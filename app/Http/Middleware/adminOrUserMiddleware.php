@@ -32,8 +32,6 @@ class adminOrUserMiddleware
                 'Authorization' => $authorizationHeader,
             ])->get($urlAkses)->json();
 
-            dd($akses);
-
             if (!isset($akses['data']) || $akses['data']['level_akses'] < 10) {
                 return response()->json(['code' => 401, 'error' => 'Don\'t have access for this feature'], 401);
             }
